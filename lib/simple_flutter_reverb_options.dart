@@ -1,4 +1,3 @@
-
 class SimpleFlutterReverbOptions {
   final String scheme;
   final String host;
@@ -8,6 +7,7 @@ class SimpleFlutterReverbOptions {
   final String? authUrl;
   final String privatePrefix;
   final bool usePrefix;
+  final bool usePort;
 
   SimpleFlutterReverbOptions({
     required this.scheme,
@@ -18,5 +18,6 @@ class SimpleFlutterReverbOptions {
     this.authUrl,
     this.privatePrefix = 'private-',
     this.usePrefix = true,
+    this.usePort = true,
   });
 }

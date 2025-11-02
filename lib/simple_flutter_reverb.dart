@@ -8,8 +8,16 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 abstract class ReverbService {
   Future<String?> _authenticate(String socketId, String channelName);
-  void _subscribe(String channelName, String? broadcastAuthToken, {bool isPrivate = false});
-  void listen(void Function(dynamic) onData, String channelName, {bool isPrivate = false});
+  void _subscribe(
+    String channelName,
+    String? broadcastAuthToken, {
+    bool isPrivate = false,
+  });
+  void listen(
+    void Function(dynamic) onData,
+    String channelName, {
+    bool isPrivate = false,
+  });
   void close();
 }
 
@@ -29,15 +37,26 @@ class SimpleFlutterReverb implements ReverbService {
   }
 
   String _constructWebSocketUrl() {
-    return '${options.scheme}://${options.host}:${options.port}/app/${options.appKey}';
+    if (options.usePort) {
+      return '${options.scheme}://${options.host}:${options.port}/app/${options.appKey}';
+    } else {
+      return '${options.scheme}://${options.host}/app/${options.appKey}';
+    }
   }
 
   @override
-  void _subscribe(String channelName, String? broadcastAuthToken, {bool isPrivate = false}) {
+  void _subscribe(
+    String channelName,
+    String? broadcastAuthToken, {
+    bool isPrivate = false,
+  }) {
     try {
       final subscription = {
         "event": "pusher:subscribe",
-        "data": isPrivate ? {"channel": channelName, "auth": broadcastAuthToken} : {"channel": channelName},
+        "data":
+            isPrivate
+                ? {"channel": channelName, "auth": broadcastAuthToken}
+                : {"channel": channelName},
       };
       _channel.sink.add(jsonEncode(subscription));
     } catch (e) {
@@ -47,13 +66,18 @@ class SimpleFlutterReverb implements ReverbService {
   }
 
   @override
-  void listen(void Function(dynamic) onData, String channelName, {bool isPrivate = false}) {
+  void listen(
+    void Function(dynamic) onData,
+    String channelName, {
+    bool isPrivate = false,
+  }) {
     try {
       final channelPrefix = options.usePrefix ? options.privatePrefix : '';
-      final fullChannelName = isPrivate ? '$channelPrefix$channelName' : channelName;
+      final fullChannelName =
+          isPrivate ? '$channelPrefix$channelName' : channelName;
       _subscribe(channelName, null);
       _channel.stream.listen(
-            (message) async {
+        (message) async {
           try {
             final Map<String, dynamic> jsonMessage = jsonDecode(message);
             final response = WebsocketResponse.fromJson(jsonMessage);
@@ -66,7 +90,10 @@ class SimpleFlutterReverb implements ReverbService {
               }
 
               if (isPrivate) {
-                final authToken = await _authenticate(socketId, fullChannelName);
+                final authToken = await _authenticate(
+                  socketId,
+                  fullChannelName,
+                );
                 _subscribe(fullChannelName, authToken!, isPrivate: isPrivate);
               } else {
                 _subscribe(fullChannelName, null, isPrivate: isPrivate);
