@@ -29,6 +29,7 @@ class SimpleFlutterReverb implements ReverbService {
   SimpleFlutterReverb({required this.options}) {
     try {
       final wsUrl = _constructWebSocketUrl();
+      _logger.i('Connection on: $wsUrl');
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
     } catch (e) {
       _logger.e('Failed to connect to WebSocket: $e');
@@ -40,11 +41,11 @@ class SimpleFlutterReverb implements ReverbService {
     if (options.usePort) {
       final res =
           '${options.scheme}://${options.host}:${options.port}/app/${options.appKey}';
-      _logger.i('Connection closed: $res');
+      _logger.i('Result: $res');
       return res;
     } else {
       final res = '${options.scheme}://${options.host}/app/${options.appKey}';
-
+      _logger.i('Result: $res');
       return res;
     }
   }
