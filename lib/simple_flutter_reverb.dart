@@ -64,6 +64,8 @@ class SimpleFlutterReverb implements ReverbService {
                 ? {"channel": channelName, "auth": broadcastAuthToken}
                 : {"channel": channelName},
       };
+      final debugData = jsonEncode(subscription);
+      _logger.i('Connection on: $debugData');
       _channel.sink.add(jsonEncode(subscription));
     } catch (e) {
       _logger.e('Failed to subscribe to channel: $e');
@@ -82,6 +84,7 @@ class SimpleFlutterReverb implements ReverbService {
       final fullChannelName =
           isPrivate ? '$channelPrefix$channelName' : channelName;
       _subscribe(channelName, null);
+
       _channel.stream.listen(
         (message) async {
           try {

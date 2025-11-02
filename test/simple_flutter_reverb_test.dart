@@ -27,7 +27,7 @@ void main() {
         appKey: 'hfbjrkafs83a1xkoootz#',
         authToken: '1|zjHdvFfHPPQMAN143CwAG1yUNn6WqM3aNOTxSQs21e014064',
         authUrl: 'https://websocket.hatudsiargao.com/broadcasting/auth',
-        usePort: false,
+        usePort: true,
       );
 
       flutterReverb = SimpleFlutterReverb(options: options);
