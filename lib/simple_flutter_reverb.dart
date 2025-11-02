@@ -38,9 +38,14 @@ class SimpleFlutterReverb implements ReverbService {
 
   String _constructWebSocketUrl() {
     if (options.usePort) {
-      return '${options.scheme}://${options.host}:${options.port}/app/${options.appKey}';
+      final res =
+          '${options.scheme}://${options.host}:${options.port}/app/${options.appKey}';
+      _logger.i('Connection closed: $res');
+      return res;
     } else {
-      return '${options.scheme}://${options.host}/app/${options.appKey}';
+      final res = '${options.scheme}://${options.host}/app/${options.appKey}';
+
+      return res;
     }
   }
 
