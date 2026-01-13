@@ -118,14 +118,13 @@ class SimpleFlutterReverb implements ReverbService {
               _logger.e('Error processing message: $e');
             }
           },
-          onError:
-              (error) => () {
-                if (options.onError != null) {
-                  options.onError?.call(error);
-                } else {
-                  _logger.e('WebSocket error: $error');
-                }
-              },
+          onError: (error, stackTrace) {
+            if (options.onError != null) {
+              options.onError?.call(error);
+            } else {
+              _logger.e('WebSocket error: $error');
+            }
+          },
           onDone: () async {
             _logger.i('Connection closed: $channelName');
             try {
