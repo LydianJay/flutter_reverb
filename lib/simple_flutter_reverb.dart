@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:simple_flutter_reverb/simple_flutter_reverb_options.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
@@ -8,17 +7,35 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 abstract class ReverbService {
   Future<String?> _authenticate(String socketId, String channelName);
-  void _subscribe(String channelName, String? broadcastAuthToken, {bool isPrivate = false});
-  void listen(void Function(dynamic) onData, String channelName, {bool isPrivate = false});
+  void _subscribe(
+    String channelName,
+    String? broadcastAuthToken, {
+    bool isPrivate = false,
+  });
+  void listen(
+    void Function(dynamic) onData,
+    String channelName, {
+    bool isPrivate = false,
+  });
   void close();
 }
 
 class SimpleFlutterReverb implements ReverbService {
-  late final WebSocketChannel _channel;
+  late WebSocketChannel _channel;
   final SimpleFlutterReverbOptions options;
   final Logger _logger = Logger();
 
   SimpleFlutterReverb({required this.options}) {
+    try {
+      final wsUrl = _constructWebSocketUrl();
+      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+    } catch (e) {
+      _logger.e('Failed to connect to WebSocket: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _connect() async {
     try {
       final wsUrl = _constructWebSocketUrl();
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
@@ -33,11 +50,18 @@ class SimpleFlutterReverb implements ReverbService {
   }
 
   @override
-  void _subscribe(String channelName, String? broadcastAuthToken, {bool isPrivate = false}) {
+  void _subscribe(
+    String channelName,
+    String? broadcastAuthToken, {
+    bool isPrivate = false,
+  }) {
     try {
       final subscription = {
         "event": "pusher:subscribe",
-        "data": isPrivate ? {"channel": channelName, "auth": broadcastAuthToken} : {"channel": channelName},
+        "data":
+            isPrivate
+                ? {"channel": channelName, "auth": broadcastAuthToken}
+                : {"channel": channelName},
       };
       _channel.sink.add(jsonEncode(subscription));
     } catch (e) {
@@ -47,41 +71,110 @@ class SimpleFlutterReverb implements ReverbService {
   }
 
   @override
-  void listen(void Function(dynamic) onData, String channelName, {bool isPrivate = false}) {
+  void listen(
+    void Function(dynamic) onData,
+    String channelName, {
+    bool isPrivate = false,
+  }) {
     try {
       final channelPrefix = options.usePrefix ? options.privatePrefix : '';
-      final fullChannelName = isPrivate ? '$channelPrefix$channelName' : channelName;
-      _subscribe(channelName, null);
-      _channel.stream.listen(
-            (message) async {
-          try {
-            final Map<String, dynamic> jsonMessage = jsonDecode(message);
-            final response = WebsocketResponse.fromJson(jsonMessage);
+      final fullChannelName =
+          isPrivate ? '$channelPrefix$channelName' : channelName;
 
-            if (response.event == 'pusher:connection_established') {
-              final socketId = response.data?['socket_id'];
+      void attachListener() {
+        _channel.stream.listen(
+          (message) async {
+            try {
+              final Map<String, dynamic> jsonMessage = jsonDecode(message);
+              final response = WebsocketResponse.fromJson(jsonMessage);
 
-              if (socketId == null) {
-                throw Exception('Socket ID is missing');
+              if (response.event == 'pusher:connection_established') {
+                final socketId = response.data?['socket_id'];
+
+                if (socketId == null) {
+                  throw Exception('Socket ID is missing');
+                }
+
+                if (isPrivate) {
+                  final authToken = await _authenticate(
+                    socketId,
+                    fullChannelName,
+                  );
+                  if (authToken != null) {
+                    _subscribe(
+                      fullChannelName,
+                      authToken,
+                      isPrivate: isPrivate,
+                    );
+                  }
+                } else {
+                  _subscribe(fullChannelName, null, isPrivate: isPrivate);
+                }
+              } else if (response.event == 'pusher:ping') {
+                _channel.sink.add(jsonEncode({'event': 'pusher:pong'}));
               }
-
-              if (isPrivate) {
-                final authToken = await _authenticate(socketId, fullChannelName);
-                _subscribe(fullChannelName, authToken!, isPrivate: isPrivate);
-              } else {
-                _subscribe(fullChannelName, null, isPrivate: isPrivate);
-              }
-            } else if (response.event == 'pusher:ping') {
-              _channel.sink.add(jsonEncode({'event': 'pusher:pong'}));
+              onData(response);
+            } catch (e) {
+              _logger.e('Error processing message: $e');
             }
-            onData(response);
-          } catch (e) {
-            _logger.e('Error processing message: $e');
-          }
-        },
-        onError: (error) => _logger.e('WebSocket error: $error'),
-        onDone: () => _logger.i('Connection closed: $channelName'),
-      );
+          },
+          onError:
+              (error) => () {
+                if (options.onError != null) {
+                  options.onError?.call(error);
+                } else {
+                  _logger.e('WebSocket error: $error');
+                }
+              },
+          onDone: () async {
+            _logger.i('Connection closed: $channelName');
+            try {
+              options.onClose?.call(fullChannelName);
+            } catch (e) {
+              _logger.e('onClose handler error: $e');
+            }
+
+            if (options.reconnectOnClose) {
+              for (
+                var attempt = 1;
+                attempt <= options.maxReconnectAttempts;
+                attempt++
+              ) {
+                final wait = Duration(
+                  milliseconds:
+                      options.reconnectInterval.inMilliseconds * attempt,
+                );
+                _logger.i(
+                  'Attempting reconnect #$attempt in ${wait.inSeconds}s',
+                );
+                await Future.delayed(wait);
+                try {
+                  await _connect();
+                  attachListener();
+                  _logger.i(
+                    'Reconnected on attempt #$attempt to $fullChannelName',
+                  );
+                  break;
+                } catch (e) {
+                  _logger.e('Reconnect attempt #$attempt failed: $e');
+                  if (attempt == options.maxReconnectAttempts) {
+                    _logger.e(
+                      'Max reconnect attempts reached for $fullChannelName',
+                    );
+                  }
+                }
+              }
+            }
+          },
+        );
+      }
+
+      // initial subscribe attempt (will finalize on connection_established)
+      try {
+        _subscribe(channelName, null);
+      } catch (_) {}
+
+      attachListener();
     } catch (e) {
       _logger.e('Failed to listen to WebSocket: $e');
       rethrow;

@@ -1,4 +1,3 @@
-
 class SimpleFlutterReverbOptions {
   final String scheme;
   final String host;
@@ -8,6 +7,11 @@ class SimpleFlutterReverbOptions {
   final String? authUrl;
   final String privatePrefix;
   final bool usePrefix;
+  final void Function(String channelName)? onClose;
+  final void Function(dynamic error)? onError;
+  final bool reconnectOnClose;
+  final int maxReconnectAttempts;
+  final Duration reconnectInterval;
 
   SimpleFlutterReverbOptions({
     required this.scheme,
@@ -18,5 +22,10 @@ class SimpleFlutterReverbOptions {
     this.authUrl,
     this.privatePrefix = 'private-',
     this.usePrefix = true,
+    this.onClose,
+    this.onError,
+    this.reconnectOnClose = false,
+    this.maxReconnectAttempts = 5,
+    this.reconnectInterval = const Duration(seconds: 2),
   });
 }
